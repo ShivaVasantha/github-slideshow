@@ -64,11 +64,18 @@ account (see the backend's Implementation Guide) to load live data.
 
 ## Status / next
 
-- **Done:** toolchain + shell, login + auth (real `/auth/login` + 401 refresh),
-  section nav for all 32 modules, entitlement gating, CSS-variable theming,
-  WS client, and the Rooms slice end-to-end.
-- **Next (per the phased plan):** Bookings + Folio (finish Phase 1 money data),
-  then Housekeeping, then F&B/KDS with real-time — each a repeat of the Rooms slice.
-- **Backend:** carries forward unchanged; migrate `apps/api` (JS→TS) in place.
-  The prototype's caveats still hold until each module's tables land
-  (see `backend/MIGRATION-NOTES.md`).
+- **Done — shell:** toolchain, login + auth (real `/auth/login` + 401 refresh),
+  section nav for all 32 modules, entitlement gating, CSS-variable theming, WS client.
+- **Done — Phase 1 money data (front desk):**
+  - **Rooms** — live board, optimistic housekeeping updates, WS refresh.
+  - **Bookings** — list with status filters, check-in modal (real
+    `/bookings/checkin`), check-out (real `/bookings/:id/checkout`); both
+    invalidate the rooms cache so the board stays truthful.
+  - **Folio** — running bill per in-house guest derived from real booking data;
+    incidental lines are session-local until `folio_line`/`folio_payment` land
+    (schema already defined in `packages/shared`).
+- **Next (per the phased plan):** Housekeeping (work orders), then F&B → Kitchen
+  (KDS) with real-time — each a repeat of the Rooms/Bookings slice.
+- **Backend:** carries forward unchanged; migrate `apps/api` (JS→TS) in place and
+  add the folio tables. The prototype's caveats hold until each module's tables
+  land (see `backend/MIGRATION-NOTES.md`).

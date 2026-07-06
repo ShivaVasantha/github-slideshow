@@ -132,6 +132,48 @@ body { background: var(--sc-bg); }
 .sc-loading, .sc-empty { padding: 40px; text-align: center; color: var(--sc-dim); }
 .sc-empty--error { color: var(--sc-danger); }
 
+/* ── Bookings / tables ──────────────────────────────────────── */
+.sc-bookings__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.sc-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.sc-pill { border: 1px solid var(--sc-border); background: var(--sc-surface); color: var(--sc-text);
+  padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; }
+.sc-pill--active { background: var(--sc-primary); color: var(--sc-primaryText); border-color: transparent; }
+
+.sc-table__wrap { overflow-x: auto; border: 1px solid var(--sc-border); border-radius: var(--sc-radius); background: var(--sc-surface); }
+.sc-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.sc-table th, .sc-table td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--sc-border); }
+.sc-table th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--sc-dim); }
+.sc-table tr:last-child td { border-bottom: none; }
+.sc-table__total td { font-weight: 700; }
+.sc-num { text-align: right; font-variant-numeric: tabular-nums; }
+.sc-cell-strong { font-weight: 600; }
+.sc-cell-dim { color: var(--sc-dim); font-size: 12.5px; }
+.sc-badge--status-CHECKED_IN { color: var(--sc-primary); }
+.sc-badge--status-RESERVED { color: var(--sc-warn); }
+.sc-badge--status-CHECKED_OUT { color: var(--sc-dim); }
+
+/* ── Modal ──────────────────────────────────────────────────── */
+.sc-modal__backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; z-index: 60; padding: 20px; }
+.sc-modal { width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; background: var(--sc-surface);
+  border: 1px solid var(--sc-border); border-radius: 16px; padding: 24px; }
+.sc-modal__title { margin: 0 0 18px; }
+.sc-modal__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.sc-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sc-field--inline { flex-direction: row; align-items: center; gap: 8px; }
+
+/* ── Folio ──────────────────────────────────────────────────── */
+.sc-folio { display: grid; grid-template-columns: 240px 1fr; gap: 18px; align-items: start; }
+.sc-folio__list { display: flex; flex-direction: column; gap: 8px; }
+.sc-folio__guest { text-align: left; padding: 10px 12px; border: 1px solid var(--sc-border); border-radius: 10px;
+  background: var(--sc-surface); cursor: pointer; }
+.sc-folio__guest--active { border-color: var(--sc-primary); box-shadow: inset 3px 0 0 var(--sc-primary); }
+.sc-folio__detail { background: var(--sc-surface); border: 1px solid var(--sc-border); border-radius: var(--sc-radius); padding: 20px; }
+.sc-folio__detail header { margin-bottom: 14px; }
+.sc-folio__detail h1 { margin: 0; }
+.sc-folio__post { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.sc-folio__note { margin-top: 12px; }
+@media (max-width: 820px) { .sc-folio { grid-template-columns: 1fr; } }
+
 /* ── Toasts ─────────────────────────────────────────────────── */
 .sc-toast-stack { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
 .sc-toast { padding: 10px 16px; border-radius: 10px; color: #fff; font-size: 13px; box-shadow: 0 10px 30px -15px rgba(0,0,0,.5); }

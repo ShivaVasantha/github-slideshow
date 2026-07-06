@@ -13,10 +13,18 @@ import { ModulePlaceholder } from "@/features/_shared/ModulePlaceholder";
 const RoomsPage = lazy(() =>
   import("@/features/front-desk/rooms/RoomsPage").then((m) => ({ default: m.RoomsPage })),
 );
+const BookingsPage = lazy(() =>
+  import("@/features/front-desk/bookings/BookingsPage").then((m) => ({ default: m.BookingsPage })),
+);
+const FolioPage = lazy(() =>
+  import("@/features/front-desk/folio/FolioPage").then((m) => ({ default: m.FolioPage })),
+);
 
 /** Feature registry: module id → its lazy component. Grows as modules migrate. */
 const FEATURES: Record<string, ComponentType> = {
   rooms: RoomsPage,
+  bookings: BookingsPage,
+  folio: FolioPage,
 };
 
 function ModuleRoute() {
