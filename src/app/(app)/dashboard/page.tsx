@@ -8,6 +8,7 @@ import { StatCard, PageHeader, Badge, Money } from "@/components/ui";
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  if (user.role === "BORROWER") return <BorrowerHome name={user.name} customerId={user.customerId} />;
   const scope = loanScopeWhere(user);
 
   const loans = await prisma.loan.findMany({
@@ -161,6 +162,144 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Borrower home — a borrower sees only their own loans, dues and receipts.
+// ---------------------------------------------------------------------------
+
+async function BorrowerHome({ name, customerId }: { name: string; customerId: string | null }) {
+  if (!customerId) {
+    return (
+      <div>
+        <PageHeader title={`Welcome, ${name.split(" ")[0]}`} />
+        <div className="card p-6 text-sm text-slate-500">
+          Your account is not linked to a customer profile yet. Please contact the office.
+        </div>
+      </div>
+    );
+  }
+
+  const loans = await prisma.loan.findMany({
+    where: { customerId },
+    include: {
+      installments: true,
+      charges: true,
+      vehicle: true,
+      payments: { orderBy: { paidAt: "desc" }, take: 6 },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  let totalOutstanding = 0;
+  let totalOverdue = 0;
+  for (const l of loans) {
+    const pos = computeLoanPosition(l.installments, l.charges);
+    totalOutstanding += pos.totalReceivable;
+    totalOverdue += pos.overdueAmount;
+  }
+
+  const recentPayments = loans
+    .flatMap((l) => l.payments.map((p) => ({ ...p, agreementNo: l.agreementNo })))
+    .sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())
+    .slice(0, 6);
+
+  return (
+    <div>
+      <PageHeader title={`Welcome, ${name.split(" ")[0]}`} subtitle="Your loans at a glance" />
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Active loans" value={String(loans.filter((l) => l.status === "ACTIVE").length)} />
+        <StatCard label="Total outstanding" value={formatINR(totalOutstanding)} />
+        <StatCard
+          label="Overdue"
+          value={formatINR(totalOverdue)}
+          tone={totalOverdue > 0.5 ? "bad" : "good"}
+        />
+      </div>
+
+      <div className="mt-6 space-y-4">
+        {loans.map((l) => {
+          const pos = computeLoanPosition(l.installments, l.charges);
+          return (
+            <div key={l.id} className="card p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <Link href={`/loans/${l.id}`} className="text-lg font-semibold text-brand-700">
+                    {l.agreementNo}
+                  </Link>
+                  <div className="text-sm text-slate-500">{l.vehicle.registrationNo}</div>
+                </div>
+                <Badge value={l.status} />
+              </div>
+              <div className="mt-4 grid gap-4 text-sm sm:grid-cols-4">
+                <Kv label="EMI" value={formatINR(l.emiAmount)} />
+                <Kv
+                  label="Next due"
+                  value={
+                    pos.nextDueDate
+                      ? `${new Date(pos.nextDueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} · ${formatINR(pos.nextDueAmount)}`
+                      : "—"
+                  }
+                />
+                <Kv label="Outstanding" value={formatINR(pos.totalReceivable)} />
+                <Kv
+                  label="Overdue"
+                  value={formatINR(pos.overdueAmount)}
+                  tone={pos.overdueAmount > 0.5 ? "bad" : undefined}
+                />
+              </div>
+              {pos.totalDiscountGiven > 0.5 && (
+                <div className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                  You&apos;ve earned {formatINR(pos.totalDiscountGiven)} in on-time discounts on this loan.
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {loans.length === 0 && (
+          <div className="card p-6 text-sm text-slate-500">You have no loans on record.</div>
+        )}
+      </div>
+
+      {recentPayments.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-3 text-sm font-semibold text-slate-500">Recent payments</h2>
+          <div className="card overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="th">Receipt</th>
+                  <th className="th">Agreement</th>
+                  <th className="th">Date</th>
+                  <th className="th text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {recentPayments.map((p) => (
+                  <tr key={p.id}>
+                    <td className="td font-medium">{p.receiptNo}</td>
+                    <td className="td">{p.agreementNo}</td>
+                    <td className="td">{new Date(p.paidAt).toLocaleDateString("en-IN")}</td>
+                    <td className="td text-right"><Money value={p.amount} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Kv({ label, value, tone }: { label: string; value: string; tone?: "bad" }) {
+  return (
+    <div>
+      <div className="text-xs text-slate-400">{label}</div>
+      <div className={`font-medium ${tone === "bad" ? "text-rose-600" : "text-slate-800"}`}>{value}</div>
     </div>
   );
 }

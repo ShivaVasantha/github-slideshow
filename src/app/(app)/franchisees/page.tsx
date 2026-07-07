@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/guard";
 import { computeLoanPosition } from "@/lib/domain/outstanding";
@@ -51,7 +52,11 @@ export default async function FranchiseesPage() {
                 return (
                   <tr key={f.id} className="hover:bg-slate-50">
                     <td className="td font-mono text-xs">{f.code}</td>
-                    <td className="td font-medium">{f.name}</td>
+                    <td className="td font-medium">
+                      <Link href={`/franchisees/${f.id}`} className="text-brand-700">
+                        {f.name}
+                      </Link>
+                    </td>
                     <td className="td text-right">{f.loans.length}</td>
                     <td className="td text-right">{toNumber(f.defaultFranchiseeSharePct)}%</td>
                     <td className="td text-right">{formatINR(Math.max(0, franchiseeNet))}</td>

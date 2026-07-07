@@ -75,7 +75,11 @@ export default async function CustomerDetailPage({
                 <tbody className="divide-y divide-slate-100">
                   {customer.vehicles.map((v) => (
                     <tr key={v.id}>
-                      <td className="td font-medium">{v.registrationNo}</td>
+                      <td className="td font-medium">
+                        <Link href={`/vehicles/${v.id}`} className="text-brand-700">
+                          {v.registrationNo}
+                        </Link>
+                      </td>
                       <td className="td">{v.type.replaceAll("_", " ")}</td>
                       <td className={`td ${expiryTone(v.insuranceExpiry)}`}>{fmtDate(v.insuranceExpiry)}</td>
                       <td className={`td ${expiryTone(v.fitnessExpiry)}`}>{fmtDate(v.fitnessExpiry)}</td>

@@ -40,6 +40,55 @@ function toDate(v?: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+const renewSchema = z.object({
+  vehicleId: z.string().min(1),
+  doc: z.enum(["insurance", "fitness", "permit"]),
+  expiry: z.string().min(1, "Expiry date is required"),
+  insuranceProvider: z.string().trim().optional(),
+  insurancePolicyNo: z.string().trim().optional(),
+  permitType: z.string().trim().optional(),
+});
+
+/** Renew/update a single compliance document (insurance, fitness or permit). */
+export async function renewCompliance(
+  _prev: { error?: string; ok?: string } | undefined,
+  formData: FormData,
+): Promise<{ error?: string; ok?: string }> {
+  await requireRole("ADMIN", "STAFF");
+
+  const parsed = renewSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const d = parsed.data;
+  const expiry = toDate(d.expiry);
+  if (!expiry) return { error: "Expiry date is invalid." };
+
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: d.vehicleId } });
+  if (!vehicle) return { error: "Vehicle not found." };
+
+  const data: Record<string, unknown> = {};
+  if (d.doc === "insurance") {
+    data.insuranceExpiry = expiry;
+    if (d.insuranceProvider) data.insuranceProvider = d.insuranceProvider;
+    if (d.insurancePolicyNo) data.insurancePolicyNo = d.insurancePolicyNo;
+  } else if (d.doc === "fitness") {
+    data.fitnessExpiry = expiry;
+  } else {
+    data.permitExpiry = expiry;
+    if (d.permitType) data.permitType = d.permitType;
+  }
+
+  await prisma.vehicle.update({ where: { id: d.vehicleId }, data });
+
+  revalidatePath(`/vehicles/${d.vehicleId}`);
+  revalidatePath("/vehicles");
+  revalidatePath("/compliance");
+  revalidatePath(`/customers/${vehicle.customerId}`);
+  revalidatePath("/dashboard");
+  return { ok: `${d.doc[0].toUpperCase() + d.doc.slice(1)} updated.` };
+}
+
 export async function createVehicle(
   _prev: { error?: string } | undefined,
   formData: FormData,

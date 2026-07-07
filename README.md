@@ -5,9 +5,11 @@ that lends against vehicles through an **HLF franchise co-lending model**.
 
 > **Milestone 1 — Loan core.** Customers, vehicles, loan agreements, co-lending
 > shares, EMI schedules, payments, penalties/charges and the zero-overdue
-> discount. Vehicle compliance tracking (insurance/fitness/permit expiry) and the
-> franchisee co-lending ledger are modelled here too, ready to be expanded in
-> later milestones.
+> discount.
+>
+> **Milestone 2 — Compliance, settlements & portals.** Vehicle compliance
+> renewals and a fleet-wide expiry alerts page, franchisee statements and
+> co-lending settlement position, and a tailored borrower home.
 
 ## What it does today
 
@@ -17,14 +19,18 @@ that lends against vehicles through an **HLF franchise co-lending model**.
 - **Customers** — KYC (Aadhaar/PAN), guarantor details, and their vehicles.
 - **Vehicles** — taxi, transport, personal, goods carrier, tractor, earthmover,
   bulldozer and more, with insurance / fitness / permit expiry tracking and
-  colour-coded expiry warnings.
+  colour-coded expiry warnings. Each vehicle has a detail page where staff
+  **renew/update** any document, and a fleet-wide **Compliance** page buckets
+  everything that is expired or expiring within 45 days.
 - **Loan agreements** — flat or reducing-balance interest, configurable tenure,
   processing fee, penalty rate and zero-overdue discount. Value-add services
   (e.g. vehicle insurance) can be financed into the loan. The EMI schedule is
   generated automatically on creation.
 - **Co-lending** — each loan records the franchisee vs head-office share. A
-  ledger captures disbursements and collections split between the two co-lenders
-  so settlements can be run.
+  ledger captures disbursements and collections split between the two co-lenders.
+  Each franchisee has a **statement** page showing their portfolio, a running
+  co-lending ledger, and a settlement position (capital deployed vs collected,
+  per co-lender). Franchisee-role users see only their own statement.
 - **Payments** — a receipt is recorded and applied through a waterfall
   (charges → interest → principal, oldest first). A **zero-overdue discount** is
   granted automatically when the account is current. Loans auto-close when fully
@@ -33,7 +39,9 @@ that lends against vehicles through an **HLF franchise co-lending model**.
   days past due), overdue interest, towing, collection effort, legal expenses,
   cheque bounce, and other charges. Charges can be waived before they are paid.
 - **Dashboard** — active loans, disbursed, outstanding, overdue, collections this
-  month, upcoming compliance expiries, and a ranked overdue list.
+  month, upcoming compliance expiries, and a ranked overdue list. Borrowers get a
+  **tailored home** showing each of their loans, the next EMI due, outstanding,
+  overdue, on-time discounts earned, and recent receipts.
 
 ## Tech stack
 
@@ -85,6 +93,7 @@ src/
       schedule.ts      #   EMI + amortisation schedule (flat / reducing)
       allocation.ts    #   payment waterfall + zero-overdue discount
       outstanding.ts   #   live position, overdue, penalty calculation
+      compliance.ts    #   insurance/fitness/permit expiry status
     actions/           # server actions (loans, payments, charges, customers…)
     auth/              # session, guards, role scoping
     money.ts           # rupee rounding + INR formatting
@@ -92,7 +101,7 @@ src/
   app/
     login/             # sign in
     (app)/             # authenticated shell + pages
-      dashboard/ loans/ customers/ vehicles/ franchisees/
+      dashboard/ loans/ customers/ vehicles/ compliance/ franchisees/
 ```
 
 ## Business rules worth knowing
@@ -111,9 +120,9 @@ src/
 
 ## Roadmap (next milestones)
 
-- Compliance alerting (insurance/fitness/permit expiry reminders)
-- Franchisee settlement runs and statements from the co-lending ledger
-- Borrower self-service payments and receipts
+- Automated expiry reminders (email/SMS) off the compliance data
+- Recorded franchisee settlement runs (pay-outs) against the ledger
+- Borrower self-service online EMI payments and downloadable receipts
 - Reports & exports (portfolio, collections, ageing)
 
 ---

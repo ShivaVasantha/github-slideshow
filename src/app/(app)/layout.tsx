@@ -16,7 +16,13 @@ export default async function AppLayout({
     { href: "/loans", label: "Loans", show: true },
     { href: "/customers", label: "Customers", show: staff },
     { href: "/vehicles", label: "Vehicles", show: staff },
-    { href: "/franchisees", label: "Franchisees", show: user.role === "ADMIN" || user.role === "STAFF" },
+    { href: "/compliance", label: "Compliance", show: staff },
+    { href: "/franchisees", label: "Franchisees", show: staff },
+    {
+      href: user.franchiseeId ? `/franchisees/${user.franchiseeId}` : "/dashboard",
+      label: "My statement",
+      show: user.role === "FRANCHISEE" && !!user.franchiseeId,
+    },
   ];
 
   return (

@@ -46,7 +46,11 @@ export default async function VehiclesPage() {
             <tbody className="divide-y divide-slate-100">
               {vehicles.map((v) => (
                 <tr key={v.id} className="hover:bg-slate-50">
-                  <td className="td font-medium">{v.registrationNo}</td>
+                  <td className="td font-medium">
+                    <Link href={`/vehicles/${v.id}`} className="text-brand-700">
+                      {v.registrationNo}
+                    </Link>
+                  </td>
                   <td className="td">{v.type.replaceAll("_", " ")}</td>
                   <td className="td">
                     <Link href={`/customers/${v.customerId}`} className="text-brand-700">
