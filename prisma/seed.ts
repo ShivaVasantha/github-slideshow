@@ -17,6 +17,7 @@ async function main() {
   await prisma.installment.deleteMany();
   await prisma.loanAddon.deleteMany();
   await prisma.ledgerEntry.deleteMany();
+  await prisma.settlement.deleteMany();
   await prisma.loan.deleteMany();
   await prisma.vehicle.deleteMany();
   await prisma.user.deleteMany();
@@ -413,6 +414,24 @@ async function main() {
     paidCount: 3,
     receivedByEmail: "staff@hlffinance.in",
   });
+
+  // Record one partial settlement to Anand HLF so the pay-out feature has data.
+  const anandLedger = await prisma.ledgerEntry.findMany({
+    where: { franchiseeId: anand.id, direction: "COLLECTION" },
+  });
+  const anandCollected = anandLedger.reduce((s, e) => s + Number(e.franchiseeAmount), 0);
+  if (anandCollected > 0) {
+    await prisma.settlement.create({
+      data: {
+        reference: "STL-2026-000001",
+        franchiseeId: anand.id,
+        amount: round2(anandCollected * 0.5), // settle half of what's collected for them
+        method: "BANK_TRANSFER",
+        note: "Interim settlement",
+        settledOn: subMonths(now, 1),
+      },
+    });
+  }
 
   console.log("\nSeed complete.");
   console.log("Demo logins (password: password123):");

@@ -65,9 +65,27 @@ model Franchisee {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  loans     Loan[]
-  users     User[]
-  ledger    LedgerEntry[]
+  loans       Loan[]
+  users       User[]
+  ledger      LedgerEntry[]
+  settlements Settlement[]
+}
+
+// A recorded pay-out from head office to a franchisee, settling their share of
+// collections received to date. Draws down the "collected for them" balance.
+model Settlement {
+  id           String     @id @default(cuid())
+  reference    String     @unique // e.g. STL-2026-000001
+  franchiseeId String
+  franchisee   Franchisee @relation(fields: [franchiseeId], references: [id])
+  amount       Decimal    @db.Decimal(14, 2)
+  method       PaymentMode @default(BANK_TRANSFER)
+  note         String?
+  settledOn    DateTime   @default(now())
+  createdById  String?
+  createdAt    DateTime   @default(now())
+
+  @@index([franchiseeId])
 }
 
 // ---------------------------------------------------------------------------

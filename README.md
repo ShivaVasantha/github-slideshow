@@ -31,6 +31,13 @@ that lends against vehicles through an **HLF franchise co-lending model**.
   Each franchisee has a **statement** page showing their portfolio, a running
   co-lending ledger, and a settlement position (capital deployed vs collected,
   per co-lender). Franchisee-role users see only their own statement.
+- **Settlement pay-outs** — staff record pay-outs to a franchisee (capped at the
+  current net payable); the "collected for them" balance draws down, and every
+  settlement is kept in a history with its own reference number.
+- **Reports & exports** — a **Reports** page with a portfolio summary (by
+  franchisee and by vehicle type), an **overdue ageing** table with
+  Current/1-30/31-60/61-90/90+ buckets, and a **collections** report over any
+  date range. Each report exports to **CSV** (Excel-ready).
 - **Payments** — a receipt is recorded and applied through a waterfall
   (charges → interest → principal, oldest first). A **zero-overdue discount** is
   granted automatically when the account is current. Loans auto-close when fully
@@ -111,7 +118,8 @@ src/
   app/
     login/             # sign in
     (app)/             # authenticated shell + pages
-      dashboard/ loans/ customers/ vehicles/ compliance/ franchisees/
+      dashboard/ loans/ customers/ vehicles/ compliance/
+      franchisees/ reports/ (+ reports/export CSV route)
 ```
 
 ## Business rules worth knowing
@@ -130,10 +138,10 @@ src/
 
 ## Roadmap (next milestones)
 
-- Automated expiry reminders (email/SMS) off the compliance data
-- Recorded franchisee settlement runs (pay-outs) against the ledger
-- Borrower self-service online EMI payments and downloadable receipts
-- Reports & exports (portfolio, collections, ageing)
+- Automated expiry / EMI-due reminders (email/SMS)
+- Borrower self-service online EMI payments and downloadable PDF receipts
+- Printable/PDF loan statements and settlement advices
+- Audit trail and finer-grained permissions
 
 ---
 

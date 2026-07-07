@@ -3,8 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guard";
 import { computeLoanPosition } from "@/lib/domain/outstanding";
+import { franchiseePosition } from "@/lib/domain/settlement";
 import { formatINR, toNumber } from "@/lib/money";
 import { PageHeader, StatCard, Badge, Money } from "@/components/ui";
+import { SettlementForm } from "./settlement-form";
 
 function fmtDate(d: Date): string {
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -30,25 +32,15 @@ export default async function FranchiseeDetailPage({
         orderBy: { createdAt: "desc" },
       },
       ledger: { orderBy: { occurredOn: "desc" }, include: { loan: true } },
+      settlements: { orderBy: { settledOn: "desc" } },
     },
   });
   if (!franchisee) notFound();
 
-  // Co-lending position from the ledger.
-  let franchiseeDisbursed = 0;
-  let franchiseeCollected = 0;
-  let headOfficeDisbursed = 0;
-  let headOfficeCollected = 0;
-  for (const e of franchisee.ledger) {
-    if (e.direction === "DISBURSEMENT") {
-      franchiseeDisbursed += toNumber(e.franchiseeAmount);
-      headOfficeDisbursed += toNumber(e.headOfficeAmount);
-    } else {
-      franchiseeCollected += toNumber(e.franchiseeAmount);
-      headOfficeCollected += toNumber(e.headOfficeAmount);
-    }
-  }
-  const franchiseeDeployed = franchiseeDisbursed - franchiseeCollected; // capital still in field
+  const staff = user.role === "ADMIN" || user.role === "STAFF";
+
+  // Co-lending position from the ledger + pay-outs.
+  const pos = franchiseePosition(franchisee.ledger, franchisee.settlements);
   const outstanding = franchisee.loans.reduce(
     (s, l) => s + computeLoanPosition(l.installments, l.charges).totalReceivable,
     0,
@@ -63,9 +55,14 @@ export default async function FranchiseeDetailPage({
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Loans" value={String(franchisee.loans.length)} hint={`Default share ${toNumber(franchisee.defaultFranchiseeSharePct)}%`} />
-        <StatCard label="Capital deployed (theirs)" value={formatINR(Math.max(0, franchiseeDeployed))} hint="disbursed − collected" />
-        <StatCard label="Collected for them" value={formatINR(franchiseeCollected)} tone="good" hint="their share of collections" />
-        <StatCard label="Portfolio outstanding" value={formatINR(outstanding)} />
+        <StatCard label="Capital deployed (theirs)" value={formatINR(Math.max(0, pos.deployedCapital))} hint="disbursed − collected" />
+        <StatCard label="Collected for them" value={formatINR(pos.collectedForThem)} tone="good" hint="their share of collections" />
+        <StatCard
+          label="Net payable now"
+          value={formatINR(pos.netPayable)}
+          tone={pos.netPayable > 0.5 ? "warn" : "good"}
+          hint={`${formatINR(pos.settledToDate)} settled to date`}
+        />
       </div>
 
       {/* Settlement summary */}
@@ -81,18 +78,56 @@ export default async function FranchiseeDetailPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              <SettleRow label="Disbursed (capital funded)" a={franchiseeDisbursed} b={headOfficeDisbursed} />
-              <SettleRow label="Collected (recovered)" a={franchiseeCollected} b={headOfficeCollected} />
-              <SettleRow label="Net capital in field" a={franchiseeDeployed} b={headOfficeDisbursed - headOfficeCollected} bold />
+              <SettleRow label="Disbursed (capital funded)" a={pos.disbursedByThem} b={pos.headOfficeDisbursed} />
+              <SettleRow label="Collected (recovered)" a={pos.collectedForThem} b={pos.headOfficeCollected} />
+              <SettleRow label="Net capital in field" a={pos.deployedCapital} b={pos.headOfficeDisbursed - pos.headOfficeCollected} bold />
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-slate-400">
-          Collections shown are each co-lender&apos;s share of borrower repayments, split by each
-          loan&apos;s agreed ratio. Settlement pays the franchisee their collected share less any
-          agreed fees.
-        </p>
+        <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-3 text-sm">
+          <span className="text-slate-500">Their collections settled to date</span>
+          <span className="font-medium text-slate-700">{formatINR(pos.settledToDate)}</span>
+        </div>
+        <div className="flex flex-wrap justify-between gap-2 text-sm">
+          <span className="font-semibold text-slate-700">Net payable to franchisee now</span>
+          <span className="font-semibold text-amber-600">{formatINR(pos.netPayable)}</span>
+        </div>
       </div>
+
+      {/* Record a pay-out (staff only) */}
+      {staff && (
+        <div className="mt-4 card p-5">
+          <h2 className="mb-4 text-sm font-semibold text-slate-500">Settle to franchisee</h2>
+          <SettlementForm franchiseeId={franchisee.id} netPayable={pos.netPayable} />
+        </div>
+      )}
+
+      {/* Settlement history */}
+      {franchisee.settlements.length > 0 && (
+        <div className="mt-4 card overflow-x-auto">
+          <div className="px-5 pt-4 text-sm font-semibold text-slate-500">Settlement history</div>
+          <table className="mt-2 min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="th">Reference</th>
+                <th className="th">Date</th>
+                <th className="th">Method</th>
+                <th className="th text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {franchisee.settlements.map((s) => (
+                <tr key={s.id}>
+                  <td className="td font-medium">{s.reference}</td>
+                  <td className="td">{fmtDate(s.settledOn)}</td>
+                  <td className="td">{s.method.replaceAll("_", " ")}</td>
+                  <td className="td text-right"><Money value={s.amount} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Portfolio */}

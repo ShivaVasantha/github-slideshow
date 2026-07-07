@@ -16,6 +16,7 @@ export default async function AppLayout({
     { href: "/vehicles", label: "Vehicles", show: staff },
     { href: "/compliance", label: "Compliance", show: staff },
     { href: "/franchisees", label: "Franchisees", show: staff },
+    { href: "/reports", label: "Reports", show: staff },
     {
       href: user.franchiseeId ? `/franchisees/${user.franchiseeId}` : "/dashboard",
       label: "My statement",

@@ -23,3 +23,9 @@ export async function nextReceiptNo(): Promise<string> {
   const n = await prisma.payment.count();
   return `RCP-${year}-${String(n + 1).padStart(6, "0")}`;
 }
+
+export async function nextSettlementRef(): Promise<string> {
+  const year = new Date().getFullYear();
+  const n = await prisma.settlement.count();
+  return `STL-${year}-${String(n + 1).padStart(6, "0")}`;
+}
