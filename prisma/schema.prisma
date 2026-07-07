@@ -1,0 +1,407 @@
+// HLF Finance — data model for a vehicle financing business operating an
+// HLF (franchise) co-lending model in Hosur, Tamil Nadu.
+//
+// Milestone 1 focus: the LOAN CORE. Customers, vehicles, loan agreements,
+// co-lending shares, EMI schedules, payments, charges/penalties and the
+// zero-overdue discount. Vehicle compliance (insurance/fitness/permit expiry)
+// and franchisee settlement ledgers are modelled here too so later milestones
+// build on the same foundation.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Access control
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN // full access, head office
+  STAFF // head-office employees managing day-to-day operations
+  FRANCHISEE // HLF partner — sees only their own portfolio
+  BORROWER // customer portal — sees only their own loans
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(STAFF)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Scope links: a FRANCHISEE user maps to a Franchisee, a BORROWER to a Customer.
+  franchiseeId String?
+  franchisee   Franchisee? @relation(fields: [franchiseeId], references: [id])
+  customerId   String?
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+
+  paymentsReceived Payment[] @relation("PaymentReceivedBy")
+}
+
+// ---------------------------------------------------------------------------
+// Franchise (HLF) — co-lending partners
+// ---------------------------------------------------------------------------
+
+model Franchisee {
+  id             String  @id @default(cuid())
+  code           String  @unique // e.g. HLF-HSR-001
+  name           String
+  contactPerson  String?
+  phone          String?
+  email          String?
+  address        String?
+  // Default share the FRANCHISEE funds on each loan they originate (%).
+  // Head office funds the remainder. Overridable per loan.
+  defaultFranchiseeSharePct Decimal @default(80) @db.Decimal(5, 2)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  loans       Loan[]
+  users       User[]
+  ledger      LedgerEntry[]
+  settlements Settlement[]
+}
+
+// A recorded pay-out from head office to a franchisee, settling their share of
+// collections received to date. Draws down the "collected for them" balance.
+model Settlement {
+  id           String     @id @default(cuid())
+  reference    String     @unique // e.g. STL-2026-000001
+  franchiseeId String
+  franchisee   Franchisee @relation(fields: [franchiseeId], references: [id])
+  amount       Decimal    @db.Decimal(14, 2)
+  method       PaymentMode @default(BANK_TRANSFER)
+  note         String?
+  settledOn    DateTime   @default(now())
+  createdById  String?
+  createdAt    DateTime   @default(now())
+
+  @@index([franchiseeId])
+}
+
+// ---------------------------------------------------------------------------
+// Customers (borrowers)
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id         String   @id @default(cuid())
+  code       String   @unique // e.g. CUS-000123
+  name       String
+  phone      String?
+  altPhone   String?
+  email      String?
+  address    String?
+  city       String?
+  state      String?  @default("Tamil Nadu")
+  pincode    String?
+  // KYC
+  aadhaarNo  String?
+  panNo      String?
+  // Guarantor
+  guarantorName    String?
+  guarantorPhone   String?
+  guarantorAddress String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  vehicles Vehicle[]
+  loans    Loan[]
+  users    User[]
+}
+
+// ---------------------------------------------------------------------------
+// Vehicles (loan collateral) + compliance tracking
+// ---------------------------------------------------------------------------
+
+enum VehicleType {
+  TAXI
+  TRANSPORT
+  PERSONAL
+  GOODS_CARRIER
+  TRACTOR
+  EARTHMOVER
+  BULLDOZER
+  OTHER
+}
+
+model Vehicle {
+  id             String      @id @default(cuid())
+  registrationNo String      @unique
+  type           VehicleType
+  make           String?
+  model          String?
+  manufactureYear Int?
+  engineNo       String?
+  chassisNo      String?
+
+  // Compliance / expiry tracking (milestone 2 will add alerting on these).
+  insuranceProvider String?
+  insurancePolicyNo String?
+  insuranceExpiry   DateTime?
+  fitnessExpiry     DateTime?
+  permitType        String?
+  permitExpiry      DateTime?
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  loans Loan[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Loan agreement
+// ---------------------------------------------------------------------------
+
+enum InterestMethod {
+  FLAT // interest on original principal across full tenure
+  REDUCING // interest on outstanding balance
+}
+
+enum LoanStatus {
+  DRAFT
+  ACTIVE
+  CLOSED // fully paid
+  FORECLOSED // settled early
+  WRITTEN_OFF
+}
+
+model Loan {
+  id          String   @id @default(cuid())
+  agreementNo String   @unique // e.g. AGR-2026-000045
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+
+  franchiseeId String
+  franchisee   Franchisee @relation(fields: [franchiseeId], references: [id])
+
+  // Money
+  principal      Decimal        @db.Decimal(14, 2) // financed amount (incl. add-ons)
+  interestRate   Decimal        @db.Decimal(6, 3) // annual %, e.g. 14.500
+  interestMethod InterestMethod @default(FLAT)
+  tenureMonths   Int
+  emiAmount      Decimal        @db.Decimal(14, 2)
+  processingFee  Decimal        @default(0) @db.Decimal(12, 2)
+
+  // Co-lending split of the principal at disbursement.
+  franchiseeSharePct Decimal @db.Decimal(5, 2) // e.g. 80.00
+  headOfficeSharePct Decimal @db.Decimal(5, 2) // e.g. 20.00
+
+  // Late-payment penalty: percent per month on the overdue installment amount.
+  penaltyRatePctPerMonth Decimal @default(2) @db.Decimal(5, 2)
+  // Discount granted (on interest) when an installment is paid with zero overdue.
+  zeroOverdueDiscountPct Decimal @default(0) @db.Decimal(5, 2)
+
+  status         LoanStatus @default(ACTIVE)
+  agreementDate  DateTime   @default(now())
+  firstEmiDate   DateTime
+  disbursedAt    DateTime?
+  closedAt       DateTime?
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  installments Installment[]
+  payments     Payment[]
+  charges      Charge[]
+  addons       LoanAddon[]
+  ledger       LedgerEntry[]
+
+  @@index([customerId])
+  @@index([franchiseeId])
+  @@index([status])
+}
+
+// Value-add services financed into the loan (e.g. vehicle insurance).
+enum AddonType {
+  INSURANCE
+  ROAD_TAX
+  ACCESSORIES
+  OTHER
+}
+
+model LoanAddon {
+  id        String    @id @default(cuid())
+  loanId    String
+  loan      Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  type      AddonType
+  description String?
+  amount    Decimal   @db.Decimal(12, 2)
+  createdAt DateTime  @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// EMI schedule
+// ---------------------------------------------------------------------------
+
+enum InstallmentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+model Installment {
+  id       String @id @default(cuid())
+  loanId   String
+  loan     Loan   @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  seqNo    Int // 1-based installment number
+  dueDate  DateTime
+
+  principalDue Decimal @db.Decimal(14, 2)
+  interestDue  Decimal @db.Decimal(14, 2)
+  totalDue     Decimal @db.Decimal(14, 2)
+
+  principalPaid Decimal @default(0) @db.Decimal(14, 2)
+  interestPaid  Decimal @default(0) @db.Decimal(14, 2)
+  discountGiven Decimal @default(0) @db.Decimal(14, 2)
+
+  status  InstallmentStatus @default(PENDING)
+  paidAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  allocations PaymentAllocation[]
+
+  @@unique([loanId, seqNo])
+  @@index([dueDate])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Charges — penalties, overdue interest, towing, collection, legal, etc.
+// ---------------------------------------------------------------------------
+
+enum ChargeType {
+  LATE_PENALTY
+  OVERDUE_INTEREST
+  TOWING
+  COLLECTION
+  LEGAL
+  BOUNCE
+  OTHER
+}
+
+model Charge {
+  id          String     @id @default(cuid())
+  loanId      String
+  loan        Loan       @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  type        ChargeType
+  description String?
+  amount      Decimal    @db.Decimal(12, 2)
+  amountPaid  Decimal    @default(0) @db.Decimal(12, 2)
+  waived      Boolean    @default(false)
+  incurredOn  DateTime   @default(now())
+  createdAt   DateTime   @default(now())
+
+  allocations PaymentAllocation[]
+
+  @@index([loanId])
+  @@index([type])
+}
+
+// ---------------------------------------------------------------------------
+// Payments and how each is allocated
+// ---------------------------------------------------------------------------
+
+enum PaymentMode {
+  CASH
+  UPI
+  BANK_TRANSFER
+  CHEQUE
+  CARD
+  OTHER
+}
+
+model Payment {
+  id        String      @id @default(cuid())
+  receiptNo String      @unique
+  loanId    String
+  loan      Loan        @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount    Decimal     @db.Decimal(14, 2)
+  mode      PaymentMode @default(CASH)
+  reference String? // UPI ref / cheque no / txn id
+  paidAt    DateTime    @default(now())
+  note      String?
+
+  receivedById String?
+  receivedBy   User?   @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
+
+  allocations PaymentAllocation[]
+
+  createdAt DateTime @default(now())
+
+  @@index([loanId])
+  @@index([paidAt])
+}
+
+// A single payment can settle interest/principal across installments and clear
+// charges. Each row records where a slice of the payment went.
+enum AllocationTarget {
+  PRINCIPAL
+  INTEREST
+  CHARGE
+}
+
+model PaymentAllocation {
+  id        String           @id @default(cuid())
+  paymentId String
+  payment   Payment          @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  target    AllocationTarget
+  amount    Decimal          @db.Decimal(14, 2)
+
+  installmentId String?
+  installment   Installment? @relation(fields: [installmentId], references: [id])
+
+  chargeId String?
+  charge   Charge? @relation(fields: [chargeId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([paymentId])
+}
+
+// ---------------------------------------------------------------------------
+// Franchisee co-lending ledger — tracks head-office vs franchisee money flows.
+// Populated on disbursement and on each collection so settlements can be run.
+// ---------------------------------------------------------------------------
+
+enum LedgerDirection {
+  DISBURSEMENT // money going out to fund a loan
+  COLLECTION // money coming back in from a borrower
+}
+
+model LedgerEntry {
+  id           String          @id @default(cuid())
+  franchiseeId String
+  franchisee   Franchisee      @relation(fields: [franchiseeId], references: [id])
+  loanId       String
+  loan         Loan            @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  direction    LedgerDirection
+  // Split of the amount between the two co-lenders.
+  franchiseeAmount Decimal @db.Decimal(14, 2)
+  headOfficeAmount Decimal @db.Decimal(14, 2)
+  description  String?
+  occurredOn   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([franchiseeId])
+  @@index([loanId])
+}

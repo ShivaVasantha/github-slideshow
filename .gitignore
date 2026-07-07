@@ -1,4 +1,28 @@
+# Legacy Jekyll slideshow (kept for history)
 _site/
 .sass-cache/
 .jekyll-metadata
 .bundle
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+next-env.d.ts
+
+# Env & secrets
+.env
+.env*.local
+
+# Logs & OS
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+
+# Prisma
+prisma/*.db
+
+# TypeScript build info
+*.tsbuildinfo
