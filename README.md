@@ -43,6 +43,13 @@ that lends against vehicles through an **HLF franchise co-lending model**.
   **tailored home** showing each of their loans, the next EMI due, outstanding,
   overdue, on-time discounts earned, and recent receipts.
 
+## Mobile & install
+
+The UI is responsive — on a phone the sidebar becomes a top bar with a slide-in
+menu. It's also a **Progressive Web App**: open the hosted URL in Safari/Chrome
+and **Add to Home Screen** to get an app icon that launches full-screen. See
+[`DEPLOY.md`](./DEPLOY.md) for hosting it and installing it on your iPhone.
+
 ## Tech stack
 
 - **Next.js 15** (App Router, React 19, TypeScript) with Server Actions
@@ -69,6 +76,9 @@ npm run db:seed
 # 4. Run
 npm run dev                 # http://localhost:3000
 ```
+
+To host it (and add it to your iPhone home screen), follow
+[`DEPLOY.md`](./DEPLOY.md).
 
 ### Demo logins (seed data)
 
